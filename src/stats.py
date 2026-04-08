@@ -128,7 +128,7 @@ def compute_player_stats(players_df: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             continue
         df[f"{col}_ptile"] = np.nan
-        for (league, season), grp in df[qualified].groupby(["league", "season"]):
+        for (league, season), _ in df[qualified].groupby(["league", "season"]):
             mask = (df["league"] == league) & (df["season"] == season) & qualified
             df.loc[mask, f"{col}_ptile"] = (
                 df.loc[mask, col].rank(pct=True, na_option="keep") * 100
@@ -138,7 +138,7 @@ def compute_player_stats(players_df: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             continue
         df[f"{col}_ptile"] = np.nan
-        for (league, season), grp in df[qualified].groupby(["league", "season"]):
+        for (league, season), _ in df[qualified].groupby(["league", "season"]):
             mask = (df["league"] == league) & (df["season"] == season) & qualified
             df.loc[mask, f"{col}_ptile"] = (
                 (1 - df.loc[mask, col].rank(pct=True, na_option="keep")) * 100
@@ -181,6 +181,35 @@ _TEAM_PTILE_LOWER = [
 ]
 
 
+def _add_ptile_columns(
+    df: pd.DataFrame,
+    cols: list[str],
+    higher_is_better: bool,
+    group_keys: list[str],
+) -> pd.DataFrame:
+    """Add percentile-rank columns to *df* for each column in *cols*.
+
+    Rankings are computed within each group defined by *group_keys*.
+    When *higher_is_better* is ``True`` a higher raw value yields a higher
+    percentile; when ``False`` a lower raw value yields a higher percentile.
+    """
+    for col in cols:
+        if col not in df.columns:
+            continue
+        df[f"{col}_ptile"] = np.nan
+        for keys, _ in df.groupby(group_keys):
+            if not isinstance(keys, tuple):
+                keys = (keys,)
+            mask = np.ones(len(df), dtype=bool)
+            for key_col, key_val in zip(group_keys, keys):
+                mask &= df[key_col] == key_val
+            ranked = df.loc[mask, col].rank(pct=True, na_option="keep")
+            if not higher_is_better:
+                ranked = 1 - ranked
+            df.loc[mask, f"{col}_ptile"] = (ranked * 100).round(1)
+    return df
+
+
 def compute_team_stats(teams_df: pd.DataFrame) -> pd.DataFrame:
     """Enrich raw understat team DataFrame with derived and normalised columns.
 
@@ -216,24 +245,7 @@ def compute_team_stats(teams_df: pd.DataFrame) -> pd.DataFrame:
     df["season_label"] = df["season"].apply(lambda y: f"{y}/{str(y + 1)[-2:]}")
 
     # Percentile ranks within league × season
-    for col in _TEAM_PTILE_HIGHER:
-        if col not in df.columns:
-            continue
-        df[f"{col}_ptile"] = np.nan
-        for (league, season), _ in df.groupby(["league", "season"]):
-            mask = (df["league"] == league) & (df["season"] == season)
-            df.loc[mask, f"{col}_ptile"] = (
-                df.loc[mask, col].rank(pct=True, na_option="keep") * 100
-            ).round(1)
-
-    for col in _TEAM_PTILE_LOWER:
-        if col not in df.columns:
-            continue
-        df[f"{col}_ptile"] = np.nan
-        for (league, season), _ in df.groupby(["league", "season"]):
-            mask = (df["league"] == league) & (df["season"] == season)
-            df.loc[mask, f"{col}_ptile"] = (
-                (1 - df.loc[mask, col].rank(pct=True, na_option="keep")) * 100
-            ).round(1)
+    df = _add_ptile_columns(df, _TEAM_PTILE_HIGHER, higher_is_better=True, group_keys=["league", "season"])
+    df = _add_ptile_columns(df, _TEAM_PTILE_LOWER, higher_is_better=False, group_keys=["league", "season"])
 
     return df

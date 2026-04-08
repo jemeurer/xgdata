@@ -218,15 +218,10 @@ _P90_DISPLAY_COLS = {c for g in _STAT_GROUPS.values() for c in g if c.endswith("
 
 
 def _fmt_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Round float columns for display."""
+    """Round float columns to 2 decimal places for display."""
     out = df.copy()
     for col in out.select_dtypes(include="float"):
-        if col in _P90_DISPLAY_COLS or col in ("shot_conversion", "xG_overperf",
-                                                 "npxG_overperf", "xA_plus_xG",
-                                                 "npxG_plus_xA"):
-            out[col] = out[col].round(2)
-        else:
-            out[col] = out[col].round(2)
+        out[col] = out[col].round(2)
     return out
 
 
