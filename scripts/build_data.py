@@ -48,16 +48,15 @@ logger = logging.getLogger(__name__)
 # Configuration — which competitions to build
 # ---------------------------------------------------------------------------
 # Each entry is (league_name, start_year).  Season 2023 → 2023/24.
-# Understat supports: EPL, La_liga, Bundesliga, Serie_A, Ligue_1, RFPL
+# Understat supports: EPL, La_liga, Bundesliga, Serie_A, Ligue_1, RFPL (russia)
+
+LEAGUES = ["EPL", "La_liga", "Bundesliga", "Serie_A", "Ligue_1"]
+SEASONS = [2022, 2023, 2024, 2025]
+
 COMPETITIONS: list[tuple[str, int]] = [
-    ("EPL", 2023),
-    ("EPL", 2022),
-    ("Bundesliga", 2023),
-    ("Bundesliga", 2022),
-    ("La_liga", 2023),
-    ("La_liga", 2022),
-    ("Serie_A", 2023),
-    ("Ligue_1", 2023),
+    (league, season)
+    for league in LEAGUES
+    for season in SEASONS
 ]
 
 PLAYER_FILE = _ROOT / "data" / "player_stats.parquet"

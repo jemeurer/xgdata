@@ -179,6 +179,39 @@ def _normalize_team_rows(raw: list[dict]) -> pd.DataFrame:
         ppda_a_def = float(ppda_a.get("def") or 1)
         row["ppda_allowed_coef"] = ppda_a_att / ppda_a_def if ppda_a_def else float("nan")
 
+        # Aggregate per-match history into season totals
+        history = team.get("history") or []
+        agg: dict[str, float] = {
+            "wins": 0, "draws": 0, "loses": 0,
+            "scored": 0, "missed": 0, "pts": 0,
+            "xG": 0.0, "xGA": 0.0, "npxG": 0.0, "npxGA": 0.0,
+            "deep": 0, "deep_allowed": 0, "xpts": 0.0,
+        }
+        for match in history:
+            result = match.get("result", "")
+            if result == "w":
+                agg["wins"] += 1
+                agg["pts"] += 3
+            elif result == "d":
+                agg["draws"] += 1
+                agg["pts"] += 1
+            elif result == "l":
+                agg["loses"] += 1
+
+            agg["scored"]       += float(match.get("scored", 0) or 0)
+            agg["missed"]       += float(match.get("missed", 0) or 0)
+            agg["xG"]           += float(match.get("xG", 0) or 0)
+            agg["xGA"]          += float(match.get("xGA", 0) or 0)
+            agg["npxG"]         += float(match.get("npxG", 0) or 0)
+            agg["npxGA"]        += float(match.get("npxGA", 0) or 0)
+            agg["deep"]         += float(match.get("deep", 0) or 0)
+            agg["deep_allowed"] += float(match.get("deep_allowed", 0) or 0)
+            agg["xpts"]         += float(match.get("xpts", 0) or 0)
+
+        agg["xGD"]       = agg["xG"] - agg["xGA"]
+        agg["npxGD"]     = agg["npxG"] - agg["npxGA"]
+        agg["xpts_diff"] = agg["xpts"] - agg["pts"]
+        row.update(agg)
         rows.append(row)
 
     df = pd.DataFrame(rows)

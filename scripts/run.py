@@ -1,35 +1,42 @@
 #!/usr/bin/env python3
-"""
-One-command launcher for xgdata.
 
-Usage
------
-    python scripts/run.py              # build data (if needed) then start app
-    python scripts/run.py --force      # force re-fetch then start app
-    python scripts/run.py --app-only   # skip build, just start the app
-"""
-
+#i sused py 3.11.15 (conda: xgdata)
 from __future__ import annotations
-
 import argparse
 import subprocess
 import sys
+import venv
 from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
+_VENV = _ROOT / ".venv"
 PLAYER_FILE = _ROOT / "data" / "player_stats.parquet"
-TEAM_FILE = _ROOT / "data" / "team_stats.parquet"
+TEAM_FILE   = _ROOT / "data" / "team_stats.parquet"
 
+# ── venv bootstrap (must be first) ──────────────────────────────────────────
+def _venv_python() -> Path:
+    """Return the path to the venv's Python executable."""
+    return _VENV / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
-def _ensure_deps() -> None:
+def _in_venv() -> bool:
+    return Path(sys.executable).resolve() == _venv_python().resolve()
+
+def _bootstrap_venv() -> None:
+    """Create venv + install deps, then re-exec this script inside it."""
+    if not _VENV.exists():
+        print("Creating virtual environment …")
+        venv.create(str(_VENV), with_pip=True)
+
+    py = str(_venv_python())
+    print("Upgrading pip …")
+    subprocess.check_call([py, "-m", "pip", "install", "-q", "--upgrade", "pip"])
+
     req = _ROOT / "requirements.txt"
-    if not req.exists():
-        return
     print("Installing / verifying dependencies …")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-q", "-r", str(req)]
-    )
+    subprocess.check_call([py, "-m", "pip", "install", "-q", "-r", str(req)])
 
+    raise SystemExit(subprocess.call([py] + sys.argv))
+# ────────────────────────────────────────────────────────────────────────────
 
 def _build(force: bool) -> None:
     cmd = [sys.executable, str(_ROOT / "scripts" / "build_data.py")]
@@ -37,22 +44,16 @@ def _build(force: bool) -> None:
         cmd.append("--force")
     subprocess.check_call(cmd)
 
-
 def _start_app() -> None:
     subprocess.check_call(
         [sys.executable, "-m", "streamlit", "run", str(_ROOT / "src" / "app.py")]
     )
 
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run xgdata end-to-end")
-    parser.add_argument("--force", action="store_true", help="Force re-fetch data")
+    parser.add_argument("--force",    action="store_true", help="Force re-fetch data")
     parser.add_argument("--app-only", action="store_true", help="Skip data build")
-    parser.add_argument("--no-deps", action="store_true", help="Skip pip install")
     args = parser.parse_args()
-
-    if not args.no_deps:
-        _ensure_deps()
 
     if not args.app_only:
         if args.force or not (PLAYER_FILE.exists() and TEAM_FILE.exists()):
@@ -66,7 +67,6 @@ def main() -> None:
         sys.exit(1)
 
     _start_app()
-
 
 if __name__ == "__main__":
     main()
